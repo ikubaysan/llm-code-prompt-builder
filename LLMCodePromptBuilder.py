@@ -2,10 +2,10 @@ import tkinter as tk
 from tkinter import filedialog, scrolledtext, Checkbutton, Label, Frame
 from tkinterdnd2 import DND_FILES, TkinterDnD
 from datetime import datetime
-import nltk
+#import nltk
 
 # Ensure NLTK tokenizers are downloaded
-nltk.download('punkt')
+#nltk.download('punkt')
 
 class FileInfo:
     def __init__(self, file_path):
@@ -16,7 +16,8 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
         self.title("LLM Code Prompt Builder")
-        self.geometry("1000x700")
+        self.geometry("1000x600")
+        self.resizable(False, False)  # Disable resizing
         self.last_update = "N/A"
         self.file_entries = {}
 
@@ -47,12 +48,12 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.update_button.pack(side=tk.TOP, pady=10)
 
         # Text display area with label
-        self.text_display_frame = tk.Frame(self)
-        self.text_display_frame.pack(expand=True, fill=tk.BOTH)
+        self.text_display_frame = tk.Frame(self, height=200)  # Set a specific height for the frame
+        self.text_display_frame.pack(fill=tk.BOTH)
         self.text_display_label = tk.Label(self.text_display_frame, text="Prompt:")
         self.text_display_label.pack()
-        self.text_display = scrolledtext.ScrolledText(self.text_display_frame, state='disabled')
-        self.text_display.pack(expand=True, fill=tk.BOTH)
+        self.text_display = scrolledtext.ScrolledText(self.text_display_frame, state='disabled', height=15)
+        self.text_display.pack(fill=tk.BOTH)
 
         # Stats and update frame
         self.stats_update_frame = tk.Frame(self)
@@ -119,7 +120,8 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
 
     def update_counts(self, text):
         char_count = len(text)
-        token_count = len(nltk.word_tokenize(text))
+        #token_count = len(nltk.word_tokenize(text))
+        token_count = len(text.split())  # Simple word count as a token estimate
         self.char_count_label.config(text=f"Characters: {char_count}")
         self.token_count_label.config(text=f"Tokens: {token_count}")
 
