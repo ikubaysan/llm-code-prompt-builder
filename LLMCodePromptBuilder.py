@@ -36,10 +36,14 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.drag_drop_frame.drop_target_register(DND_FILES)
         self.drag_drop_frame.dnd_bind('<<Drop>>', self.drop)
 
+        # Container for file list and scrollbar
+        self.file_list_container = tk.Frame(self)
+        self.file_list_container.pack(side="left", fill="both", expand=True)
+
         # File list area with checkboxes and labels
-        self.file_list_canvas = Canvas(self, borderwidth=0)
+        self.file_list_canvas = Canvas(self.file_list_container, borderwidth=0)
         self.file_list_frame = Frame(self.file_list_canvas)
-        self.file_list_scrollbar = Scrollbar(self, orient="vertical", command=self.file_list_canvas.yview)
+        self.file_list_scrollbar = Scrollbar(self.file_list_container, orient="vertical", command=self.file_list_canvas.yview)
         self.file_list_canvas.configure(yscrollcommand=self.file_list_scrollbar.set)
 
         self.file_list_scrollbar.pack(side="right", fill="y")
