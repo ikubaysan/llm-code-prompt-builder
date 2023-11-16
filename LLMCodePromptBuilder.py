@@ -92,6 +92,9 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
     def drop(self, event):
         file_paths = event.data.split()
         for file_path in file_paths:
+            if file_path in self.file_entries:
+                continue  # Skip this file as it's already added
+
             file_info = FileInfo(file_path)
             file_info.checkbox_frame = Frame(self.file_list_frame)
             file_info.checkbox = Checkbutton(file_info.checkbox_frame, variable=file_info.check_var, command=self.update_file_selection_count)
@@ -101,6 +104,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
             file_info.label.bind("<Button-1>", lambda e, cb=file_info.checkbox: cb.invoke())
             file_info.checkbox_frame.pack(anchor='w', fill='x')
             self.file_entries[file_path] = file_info
+
         self.update_file_selection_count()
 
     def toggle_checkbox(self, check_var):
