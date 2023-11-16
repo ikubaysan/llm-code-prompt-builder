@@ -1,11 +1,7 @@
 import tkinter as tk
-from tkinter import filedialog, scrolledtext, Checkbutton, Label, Frame
+from tkinter import filedialog, scrolledtext, Checkbutton, Label, Frame, Canvas, Scrollbar
 from tkinterdnd2 import DND_FILES, TkinterDnD
 from datetime import datetime
-#import nltk
-
-# Ensure NLTK tokenizers are downloaded
-#nltk.download('punkt')
 
 class FileInfo:
     def __init__(self, file_path):
@@ -41,8 +37,16 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.drag_drop_frame.dnd_bind('<<Drop>>', self.drop)
 
         # File list area with checkboxes and labels
-        self.file_list_frame = tk.Frame(self)
-        self.file_list_frame.pack(side=tk.LEFT, fill=tk.Y, expand=True)
+        self.file_list_canvas = Canvas(self, borderwidth=0)
+        self.file_list_frame = Frame(self.file_list_canvas)
+        self.file_list_scrollbar = Scrollbar(self, orient="vertical", command=self.file_list_canvas.yview)
+        self.file_list_canvas.configure(yscrollcommand=self.file_list_scrollbar.set)
+
+        self.file_list_scrollbar.pack(side="right", fill="y")
+        self.file_list_canvas.pack(side="left", fill="both", expand=True)
+        self.file_list_canvas.create_window((0,0), window=self.file_list_frame, anchor="nw")
+
+        self.file_list_frame.bind("<Configure>", self.on_frame_configure)
 
         self.update_button = tk.Button(self, text="Update Prompt", command=self.update_prompt)
         self.update_button.pack(side=tk.TOP, pady=10)
@@ -76,6 +80,10 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         # Clipboard button
         self.clipboard_button = tk.Button(self, text="Copy to Clipboard", command=self.copy_to_clipboard)
         self.clipboard_button.pack(side=tk.BOTTOM, pady=10)
+
+
+    def on_frame_configure(self, event=None):
+        self.file_list_canvas.configure(scrollregion=self.file_list_canvas.bbox("all"))
 
     def drop(self, event):
         file_paths = event.data.split()
