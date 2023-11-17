@@ -75,6 +75,14 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.file_list_scrollbar = Scrollbar(self.file_list_container, orient="vertical", command=self.file_list_canvas.yview)
         self.file_list_canvas.configure(yscrollcommand=self.file_list_scrollbar.set)
 
+        # Bind mouse wheel event to the canvas
+        self.file_list_canvas.bind("<MouseWheel>", self.on_mousewheel)
+        # Propagate mouse wheel event from the frame to the canvas
+        self.file_list_frame.bind("<MouseWheel>", lambda event: self.file_list_canvas.event_generate("<MouseWheel>", delta=event.delta))
+
+        self.bind_to_mousewheel(self.file_list_canvas, self.file_list_frame)
+
+
         self.file_list_scrollbar.pack(side="right", fill="y")
         self.file_list_canvas.pack(side="left", fill="both", expand=True)
         self.file_list_canvas.create_window((0,0), window=self.file_list_frame, anchor="nw")
@@ -113,6 +121,23 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         # Clipboard button
         self.clipboard_button = tk.Button(self, text="Copy to Clipboard", command=self.copy_to_clipboard)
         self.clipboard_button.pack(side=tk.BOTTOM, pady=10)
+
+    def bind_to_mousewheel(self, canvas, frame):
+        # Bind to the canvas
+        canvas.bind("<MouseWheel>", lambda e: self.on_mousewheel(e, canvas))
+
+        # Bind to all child widgets recursively
+        for child in frame.winfo_children():
+            self.bind_to_mousewheel(canvas, child)
+
+    def on_mousewheel(self, event, widget):
+        if os.name == 'nt':  # For Windows
+            widget.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        else:  # For Unix/Linux
+            if event.num == 4:
+                widget.yview_scroll(-1, "units")
+            elif event.num == 5:
+                widget.yview_scroll(1, "units")
 
     def process_file_path(self, file_path):
 
