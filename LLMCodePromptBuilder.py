@@ -32,6 +32,16 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.drag_drop_label = tk.Label(self.drag_drop_frame, text="Drag Files Here", bg='light grey')
         self.drag_drop_label.pack(expand=True)
 
+        # Add Select All and Deselect All buttons
+        self.selection_buttons_frame = tk.Frame(self)
+        self.selection_buttons_frame.pack(fill=tk.X)
+
+        self.select_all_button = tk.Button(self.selection_buttons_frame, text="Select All", command=self.select_all)
+        self.select_all_button.pack(side=tk.LEFT, padx=10)
+
+        self.deselect_all_button = tk.Button(self.selection_buttons_frame, text="Deselect All", command=self.deselect_all)
+        self.deselect_all_button.pack(side=tk.LEFT)
+
         # Enable drag and drop
         self.drag_drop_frame.drop_target_register(DND_FILES)
         self.drag_drop_frame.dnd_bind('<<Drop>>', self.drop)
@@ -85,6 +95,15 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.clipboard_button = tk.Button(self, text="Copy to Clipboard", command=self.copy_to_clipboard)
         self.clipboard_button.pack(side=tk.BOTTOM, pady=10)
 
+    def select_all(self):
+        for file_info in self.file_entries.values():
+            file_info.check_var.set(True)
+        self.update_file_selection_count()
+
+    def deselect_all(self):
+        for file_info in self.file_entries.values():
+            file_info.check_var.set(False)
+        self.update_file_selection_count()
 
     def on_frame_configure(self, event=None):
         self.file_list_canvas.configure(scrollregion=self.file_list_canvas.bbox("all"))
