@@ -89,7 +89,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.text_display_frame.pack(fill=tk.BOTH)
         self.text_display_label = tk.Label(self.text_display_frame, text="Prompt:")
         self.text_display_label.pack()
-        self.text_display = scrolledtext.ScrolledText(self.text_display_frame, state='disabled', height=15)
+        self.text_display = scrolledtext.ScrolledText(self.text_display_frame, state='disabled', height=14)
         self.text_display.pack(fill=tk.BOTH)
 
         # Stats and update frame
