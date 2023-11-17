@@ -35,6 +35,15 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.query_input = scrolledtext.ScrolledText(self.query_frame, height=5)
         self.query_input.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
+        # Manual Path Entry Area
+        self.manual_entry_frame = tk.Frame(self)
+        self.manual_entry_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
+        self.path_entry = tk.Entry(self.manual_entry_frame)
+        self.path_entry.pack(side=tk.LEFT, expand=True, fill=tk.X)
+        self.path_entry.bind('<Return>', self.add_path)
+        self.add_path_button = tk.Button(self.manual_entry_frame, text="Add Path", command=self.add_path)
+        self.add_path_button.pack(side=tk.RIGHT)
+
         # Drag and Drop Area
         self.drag_drop_frame = tk.Frame(self, height=100, width=1000, bg='light grey')
         self.drag_drop_frame.pack(side=tk.TOP, padx=10, pady=10)
@@ -105,6 +114,37 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.clipboard_button = tk.Button(self, text="Copy to Clipboard", command=self.copy_to_clipboard)
         self.clipboard_button.pack(side=tk.BOTTOM, pady=10)
 
+    def process_file_path(self, file_path):
+
+        # if file_path is surrounded by double quotes or single quotes, remove them
+        if (file_path.startswith('"') and file_path.endswith('"')) or (file_path.startswith("'") and file_path.endswith("'")):
+            file_path = file_path[1:-1]
+
+        normalized_path = os.path.normpath(file_path)  # Normalize the path
+        if normalized_path in self.file_entries:
+            return  # Skip this file as it's already added
+
+        # Return if the path does not exist
+        if not os.path.exists(normalized_path):
+            return
+
+        file_info = FileInfo(normalized_path)
+        file_info.checkbox_frame = Frame(self.file_list_frame)
+        file_info.checkbox = Checkbutton(file_info.checkbox_frame, variable=file_info.check_var, command=self.update_file_selection_count)
+        file_info.checkbox.pack(side=tk.LEFT)
+        file_info.label = Label(file_info.checkbox_frame, text=normalized_path, wraplength=250, justify='left')
+        file_info.label.pack(side=tk.LEFT)
+        file_info.label.bind("<Button-1>", lambda e, cb=file_info.checkbox: cb.invoke())
+        file_info.checkbox_frame.pack(anchor='w', fill='x')
+        self.file_entries[normalized_path] = file_info
+        self.update_file_selection_count()
+
+    def add_path(self, event=None):  # event parameter is added to handle the key press
+        path = self.path_entry.get().strip()
+        if path:
+            self.process_file_path(path)
+            self.path_entry.delete(0, tk.END)  # Clear the entry field
+
     def select_all(self):
         for file_info in self.file_entries.values():
             file_info.check_var.set(True)
@@ -121,41 +161,36 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
     @staticmethod
     def parse_file_paths(data_string):
         file_paths = []
-        current_path = ''
-        inside_braces = False
 
-        for char in data_string:
-            if char == '{':
-                inside_braces = True
-                current_path = ''
-            elif char == '}':
-                inside_braces = False
-                file_paths.append(current_path.strip())
-            elif inside_braces:
-                current_path += char
+        if '{' in data_string and '}' in data_string:
+            # Paths contain space(s), and are contained within braces in a single string.
+            # eg. '{C:/Users/PC/Documents/1STRESS TESTING/RAM Test 1.1.0.0/ramtest.log}
+            # {C:/Users/PC/Documents/1STRESS TESTING/RAM Test 1.1.0.0/README.txt}
+            # {C:/Users/PC/Documents/1STRESS TESTING/RAM Test 1.1.0.0/settings.txt}'
+            current_path = ''
+            inside_braces = False
+
+            for char in data_string:
+                if char == '{':
+                    inside_braces = True
+                    current_path = ''
+                elif char == '}':
+                    inside_braces = False
+                    file_paths.append(current_path.strip())
+                elif inside_braces:
+                    current_path += char
+        else:
+            # A path does not contain a space; a space separates each path.
+            # eg. 'C:/Users/PC/Desktop/misc/coding/repos/public/llm-code-prompt-builder/LLMCodePromptBuilder.py C:/Users/PC/Desktop/misc/coding/repos/public/llm-code-prompt-builder/README.md'
+            file_paths = data_string.split()
 
         return file_paths
 
     def drop(self, event):
-        # event.data looks like '{C:/Users/PC/Documents/1STRESS TESTING/RAM Test 1.1.0.0/ramtest.log} {C:/Users/PC/Documents/1STRESS TESTING/RAM Test 1.1.0.0/README.txt} {C:/Users/PC/Documents/1STRESS TESTING/RAM Test 1.1.0.0/settings.txt}'
+        # event.data looks like
         file_paths = self.parse_file_paths(event.data)
-
         for file_path in file_paths:
-            normalized_path = os.path.normpath(file_path.strip())  # Normalize and strip any extra whitespace
-            if normalized_path in self.file_entries:
-                continue  # Skip this file as it's already added
-
-            file_info = FileInfo(normalized_path)
-            file_info.checkbox_frame = Frame(self.file_list_frame)
-            file_info.checkbox = Checkbutton(file_info.checkbox_frame, variable=file_info.check_var, command=self.update_file_selection_count)
-            file_info.checkbox.pack(side=tk.LEFT)
-            file_info.label = Label(file_info.checkbox_frame, text=normalized_path, wraplength=250, justify='left')
-            file_info.label.pack(side=tk.LEFT)
-            file_info.label.bind("<Button-1>", lambda e, cb=file_info.checkbox: cb.invoke())
-            file_info.checkbox_frame.pack(anchor='w', fill='x')
-            self.file_entries[normalized_path] = file_info
-
-        self.update_file_selection_count()
+            self.process_file_path(file_path)
 
     def toggle_checkbox(self, check_var):
         check_var.set(not check_var.get())
