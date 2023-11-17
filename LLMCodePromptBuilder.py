@@ -2,11 +2,21 @@ import tkinter as tk
 from tkinter import filedialog, scrolledtext, Checkbutton, Label, Frame, Canvas, Scrollbar
 from tkinterdnd2 import DND_FILES, TkinterDnD
 from datetime import datetime
+import os
 
 class FileInfo:
     def __init__(self, file_path):
         self.file_path = file_path
         self.check_var = tk.BooleanVar()
+        self.censored_path = self.censor_username(file_path)
+
+    @staticmethod
+    def censor_username(path):
+        parts = path.split('\\')
+        # Replace the username (the part after 'Users') with 'MyUsername'
+        if 'Users' in parts and len(parts) > parts.index('Users') + 1:
+            parts[parts.index('Users') + 1] = 'MyUsername'
+        return '\\'.join(parts)
 
 class LLMCodePromptBuilder(TkinterDnD.Tk):
     def __init__(self):
@@ -26,7 +36,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.query_input.pack(side=tk.LEFT, expand=True, fill=tk.X)
 
         # Drag and Drop Area
-        self.drag_drop_frame = tk.Frame(self, height=100, width=200, bg='light grey')
+        self.drag_drop_frame = tk.Frame(self, height=100, width=1000, bg='light grey')
         self.drag_drop_frame.pack(side=tk.TOP, padx=10, pady=10)
         self.drag_drop_frame.pack_propagate(False)
         self.drag_drop_label = tk.Label(self.drag_drop_frame, text="Drag Files Here", bg='light grey')
@@ -63,7 +73,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.file_list_frame.bind("<Configure>", self.on_frame_configure)
 
         self.update_button = tk.Button(self, text="Update Prompt", command=self.update_prompt)
-        self.update_button.pack(side=tk.TOP, pady=10)
+        self.update_button.pack(side=tk.TOP, pady=0)
 
         # Text display area with label
         self.text_display_frame = tk.Frame(self, height=200)  # Set a specific height for the frame
@@ -108,21 +118,42 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
     def on_frame_configure(self, event=None):
         self.file_list_canvas.configure(scrollregion=self.file_list_canvas.bbox("all"))
 
+    @staticmethod
+    def parse_file_paths(data_string):
+        file_paths = []
+        current_path = ''
+        inside_braces = False
+
+        for char in data_string:
+            if char == '{':
+                inside_braces = True
+                current_path = ''
+            elif char == '}':
+                inside_braces = False
+                file_paths.append(current_path.strip())
+            elif inside_braces:
+                current_path += char
+
+        return file_paths
+
     def drop(self, event):
-        file_paths = event.data.split()
+        # event.data looks like '{C:/Users/PC/Documents/1STRESS TESTING/RAM Test 1.1.0.0/ramtest.log} {C:/Users/PC/Documents/1STRESS TESTING/RAM Test 1.1.0.0/README.txt} {C:/Users/PC/Documents/1STRESS TESTING/RAM Test 1.1.0.0/settings.txt}'
+        file_paths = self.parse_file_paths(event.data)
+
         for file_path in file_paths:
-            if file_path in self.file_entries:
+            normalized_path = os.path.normpath(file_path.strip())  # Normalize and strip any extra whitespace
+            if normalized_path in self.file_entries:
                 continue  # Skip this file as it's already added
 
-            file_info = FileInfo(file_path)
+            file_info = FileInfo(normalized_path)
             file_info.checkbox_frame = Frame(self.file_list_frame)
             file_info.checkbox = Checkbutton(file_info.checkbox_frame, variable=file_info.check_var, command=self.update_file_selection_count)
             file_info.checkbox.pack(side=tk.LEFT)
-            file_info.label = Label(file_info.checkbox_frame, text=file_path, wraplength=250, justify='left')
+            file_info.label = Label(file_info.checkbox_frame, text=normalized_path, wraplength=250, justify='left')
             file_info.label.pack(side=tk.LEFT)
             file_info.label.bind("<Button-1>", lambda e, cb=file_info.checkbox: cb.invoke())
             file_info.checkbox_frame.pack(anchor='w', fill='x')
-            self.file_entries[file_path] = file_info
+            self.file_entries[normalized_path] = file_info
 
         self.update_file_selection_count()
 
@@ -139,7 +170,8 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
             if file_info.check_var.get():
                 with open(file_info.file_path, 'r') as file:
                     content = file.read()
-                    prompt_text += f"CONTENTS OF {file_info.file_path}:\n\n{content}\n\n"
+                    # Use the censored path for the prompt text instead of the actual path
+                    prompt_text += f"CONTENTS OF {file_info.censored_path}:\n\n{content}\n\n"
 
         self.text_display.config(state='normal')
         self.text_display.delete(1.0, tk.END)
