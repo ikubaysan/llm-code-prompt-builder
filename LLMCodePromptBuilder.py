@@ -22,7 +22,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
         self.title("LLM Code Prompt Builder")
-        self.geometry("1000x600")
+        self.geometry("1000x800")
         self.resizable(False, False)  # Disable resizing
         self.last_update = "N/A"
         self.file_entries = {}
