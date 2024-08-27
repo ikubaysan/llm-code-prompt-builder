@@ -198,8 +198,12 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         for file_info in self.file_entries.values():
             file_info.checkbox_frame.pack_forget()
 
+        # Sort the files alphabetically by their path
+        sorted_paths = sorted(self.file_entries.keys())
+
         # Show only the files that match the search term
-        for file_info in self.file_entries.values():
+        for path in sorted_paths:
+            file_info = self.file_entries[path]
             if search_term in file_info.file_path.lower():
                 file_info.checkbox_frame.pack(anchor='w', fill='x')
 
@@ -210,17 +214,19 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         if self.whitelisted_extensions and extension not in self.whitelisted_extensions:
             return
 
-        file_info = FileInfo(file_path)
-        file_info.checkbox_frame = Frame(self.file_list_frame)
-        file_info.checkbox = Checkbutton(file_info.checkbox_frame, variable=file_info.check_var,
-                                         command=self.update_file_selection_count)
-        file_info.checkbox.pack(side=tk.LEFT)
-        file_info.label = Label(file_info.checkbox_frame, text=file_info.censored_path, wraplength=250, justify='left')
-        file_info.label.pack(side=tk.LEFT)
-        file_info.label.bind("<Button-1>", lambda e, cb=file_info.checkbox: cb.invoke())
-        self.file_entries[file_path] = file_info
-        self.filter_files()
-        self.update_file_selection_count()
+        if file_path not in self.file_entries:  # Ensure no duplicates
+            file_info = FileInfo(file_path)
+            file_info.checkbox_frame = Frame(self.file_list_frame)
+            file_info.checkbox = Checkbutton(file_info.checkbox_frame, variable=file_info.check_var,
+                                             command=self.update_file_selection_count)
+            file_info.checkbox.pack(side=tk.LEFT)
+            file_info.label = Label(file_info.checkbox_frame, text=file_info.censored_path, wraplength=250,
+                                    justify='left')
+            file_info.label.pack(side=tk.LEFT)
+            file_info.label.bind("<Button-1>", lambda e, cb=file_info.checkbox: cb.invoke())
+            self.file_entries[file_path] = file_info
+            self.filter_files()  # Update and sort the list after adding a file
+            self.update_file_selection_count()
 
     def process_directory(self, dir_path):
         for root, dirs, files in os.walk(dir_path):
@@ -288,6 +294,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         for path in selected_files:
             self.file_entries[path].checkbox_frame.destroy()
             del self.file_entries[path]
+        self.filter_files()  # Update and sort the list after removing a file
         self.update_file_selection_count()
 
     def on_frame_configure(self, event=None):
