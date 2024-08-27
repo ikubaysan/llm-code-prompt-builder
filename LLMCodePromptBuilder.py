@@ -25,7 +25,6 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.resizable(False, False)
         self.last_update = "N/A"
         self.file_entries = {}
-        self.ignore_extensions = []
 
         # Query Section
         self.query_frame = tk.Frame(self)
@@ -46,10 +45,13 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.recursion_checkbox = Checkbutton(self.options_frame, text="Recursively Add Files in Subfolders", variable=self.recursion_var)
         self.recursion_checkbox.pack(side=tk.LEFT)
 
-        self.ignore_label = tk.Label(self.options_frame, text="Ignore Extensions:")
-        self.ignore_label.pack(side=tk.LEFT, padx=(10, 0))
-        self.ignore_entry = tk.Entry(self.options_frame)
-        self.ignore_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+        self.whitelisted_extensions = ['py', 'cs', 'cpp']
+
+        self.whitelist_label = tk.Label(self.options_frame, text="Whitelisted Extensions:")
+        self.whitelist_label.pack(side=tk.LEFT, padx=(10, 0))
+        self.whitelist_entry = tk.Entry(self.options_frame)
+        self.whitelist_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+        self.whitelist_entry.insert(0, ', '.join(self.whitelisted_extensions))
 
         # Manual Path Entry Area
         self.manual_entry_frame = tk.Frame(self)
@@ -94,6 +96,9 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
 
         self.remove_selected_button = tk.Button(self.selection_buttons_frame, text="Remove Selected", command=self.remove_selected)
         self.remove_selected_button.pack(side=tk.LEFT, padx=5)
+
+        self.remove_all_button = tk.Button(self.selection_buttons_frame, text="Remove All", command=self.remove_all)
+        self.remove_all_button.pack(side=tk.LEFT, padx=5)
 
         # Container for file list and scrollbar
         self.file_list_container = tk.Frame(self)
@@ -145,6 +150,12 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.clipboard_button = tk.Button(self, text="Copy to Clipboard", command=self.copy_to_clipboard)
         self.clipboard_button.pack(side=tk.BOTTOM, pady=10)
 
+    def remove_all(self):
+        for path in list(self.file_entries.keys()):
+            self.file_entries[path].checkbox_frame.destroy()
+            del self.file_entries[path]
+        self.update_file_selection_count()
+
     def add_separator(self):
         separator = tk.Frame(self, height=2, bd=1, relief=tk.SUNKEN)
         separator.pack(fill=tk.X, padx=5, pady=10)
@@ -166,13 +177,14 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
             self.add_file(normalized_path)
 
     def add_file(self, file_path):
-        extension = os.path.splitext(file_path)[1].lower()
-        if extension in self.ignore_extensions:
+        extension = os.path.splitext(file_path)[1].lower().lstrip('.')
+        if self.whitelisted_extensions and extension not in self.whitelisted_extensions:
             return
 
         file_info = FileInfo(file_path)
         file_info.checkbox_frame = Frame(self.file_list_frame)
-        file_info.checkbox = Checkbutton(file_info.checkbox_frame, variable=file_info.check_var, command=self.update_file_selection_count)
+        file_info.checkbox = Checkbutton(file_info.checkbox_frame, variable=file_info.check_var,
+                                         command=self.update_file_selection_count)
         file_info.checkbox.pack(side=tk.LEFT)
         file_info.label = Label(file_info.checkbox_frame, text=file_info.censored_path, wraplength=250, justify='left')
         file_info.label.pack(side=tk.LEFT)
@@ -213,7 +225,8 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
             self.process_file_path(file_path)
 
     def update_prompt(self):
-        self.ignore_extensions = [ext.strip().lower() for ext in self.ignore_entry.get().split(',') if ext.strip()]
+        whitelist_input = self.whitelist_entry.get().strip()
+        self.whitelisted_extensions = [ext.strip().lower() for ext in whitelist_input.split(',') if ext.strip()]
 
         prompt_text = self.query_input.get("1.0", tk.END) + "\n\n"
         for file_info in self.file_entries.values():
