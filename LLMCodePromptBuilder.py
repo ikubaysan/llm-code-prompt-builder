@@ -91,14 +91,27 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.select_all_button = tk.Button(self.selection_buttons_frame, text="Select All", command=self.select_all)
         self.select_all_button.pack(side=tk.LEFT, padx=10)
 
-        self.deselect_all_button = tk.Button(self.selection_buttons_frame, text="Deselect All", command=self.deselect_all)
+        self.deselect_all_button = tk.Button(self.selection_buttons_frame, text="Deselect All",
+                                             command=self.deselect_all)
         self.deselect_all_button.pack(side=tk.LEFT)
 
-        self.remove_selected_button = tk.Button(self.selection_buttons_frame, text="Remove Selected", command=self.remove_selected)
+        self.remove_selected_button = tk.Button(self.selection_buttons_frame, text="Remove Selected",
+                                                command=self.remove_selected)
         self.remove_selected_button.pack(side=tk.LEFT, padx=5)
 
         self.remove_all_button = tk.Button(self.selection_buttons_frame, text="Remove All", command=self.remove_all)
         self.remove_all_button.pack(side=tk.LEFT, padx=5)
+
+        # Add Search Box
+        self.search_frame = tk.Frame(self)
+        self.search_frame.pack(fill=tk.X, pady=5)  # This is now packed directly after selection_buttons_frame
+
+        self.search_label = tk.Label(self.search_frame, text="Search:")
+        self.search_label.pack(side=tk.LEFT, padx=5)
+
+        self.search_entry = tk.Entry(self.search_frame, width=50)
+        self.search_entry.pack(side=tk.LEFT, fill=tk.X, padx=(0, 10))
+        self.search_entry.bind("<KeyRelease>", self.filter_files)
 
         # Container for file list and scrollbar
         self.file_list_container = tk.Frame(self)
@@ -151,7 +164,9 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.clipboard_button.pack(side=tk.BOTTOM, pady=10)
 
     def remove_all(self):
-        for path in list(self.file_entries.keys()):
+        search_term = self.search_entry.get().lower()
+        to_remove = [path for path, info in self.file_entries.items() if search_term in path.lower()]
+        for path in to_remove:
             self.file_entries[path].checkbox_frame.destroy()
             del self.file_entries[path]
         self.update_file_selection_count()
@@ -176,6 +191,20 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         else:
             self.add_file(normalized_path)
 
+    def filter_files(self, event=None):
+        search_term = self.search_entry.get().lower()
+
+        # Clear current view
+        for file_info in self.file_entries.values():
+            file_info.checkbox_frame.pack_forget()
+
+        # Show only the files that match the search term
+        for file_info in self.file_entries.values():
+            if search_term in file_info.file_path.lower():
+                file_info.checkbox_frame.pack(anchor='w', fill='x')
+
+        self.update_file_selection_count()
+
     def add_file(self, file_path):
         extension = os.path.splitext(file_path)[1].lower().lstrip('.')
         if self.whitelisted_extensions and extension not in self.whitelisted_extensions:
@@ -189,8 +218,8 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         file_info.label = Label(file_info.checkbox_frame, text=file_info.censored_path, wraplength=250, justify='left')
         file_info.label.pack(side=tk.LEFT)
         file_info.label.bind("<Button-1>", lambda e, cb=file_info.checkbox: cb.invoke())
-        file_info.checkbox_frame.pack(anchor='w', fill='x')
         self.file_entries[file_path] = file_info
+        self.filter_files()
         self.update_file_selection_count()
 
     def process_directory(self, dir_path):
@@ -288,14 +317,19 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.clipboard_append(self.text_display.get(1.0, tk.END))
 
     def select_all(self):
+        search_term = self.search_entry.get().lower()
         for file_info in self.file_entries.values():
-            file_info.check_var.set(True)
+            if search_term in file_info.file_path.lower():
+                file_info.check_var.set(True)
         self.update_file_selection_count()
 
     def deselect_all(self):
+        search_term = self.search_entry.get().lower()
         for file_info in self.file_entries.values():
-            file_info.check_var.set(False)
+            if search_term in file_info.file_path.lower():
+                file_info.check_var.set(False)
         self.update_file_selection_count()
+
 
 if __name__ == "__main__":
     app = LLMCodePromptBuilder()
