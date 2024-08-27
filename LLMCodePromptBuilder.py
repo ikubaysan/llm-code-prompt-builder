@@ -108,11 +108,11 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.file_selection_count_label = tk.Label(self.stats_update_frame, text="Selected Files: 0")
         self.file_selection_count_label.pack(side=tk.LEFT, padx=10)
 
-        # Character and Token Counts labels
+        # Character and Word Counts labels
         self.char_count_label = tk.Label(self.stats_update_frame, text="Characters: 0")
         self.char_count_label.pack(side=tk.LEFT, padx=10)
-        self.token_count_label = tk.Label(self.stats_update_frame, text="Tokens: 0")
-        self.token_count_label.pack(side=tk.LEFT, padx=10)
+        self.word_count_label = tk.Label(self.stats_update_frame, text="Words: 0")
+        self.word_count_label.pack(side=tk.LEFT, padx=10)
 
         # Label for latest update timestamp
         self.update_timestamp_label = tk.Label(self.stats_update_frame, text="Latest Update: N/A")
@@ -238,7 +238,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.text_display.insert(tk.INSERT, prompt_text)
         self.text_display.config(state='disabled')
 
-        # Update character and token counts
+        # Update character and word counts
         self.update_counts(prompt_text)
 
         # Update timestamp
@@ -247,10 +247,9 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
 
     def update_counts(self, text):
         char_count = len(text)
-        #token_count = len(nltk.word_tokenize(text))
-        token_count = len(text.split())  # Simple word count as a token estimate
+        word_count = len(text.split())  # Simple word count as a token estimate
         self.char_count_label.config(text=f"Characters: {char_count}")
-        self.token_count_label.config(text=f"Tokens: {token_count}")
+        self.word_count_label.config(text=f"Words: {word_count}")
 
     def update_file_selection_count(self):
         count = sum(file_info.check_var.get() for file_info in self.file_entries.values())
