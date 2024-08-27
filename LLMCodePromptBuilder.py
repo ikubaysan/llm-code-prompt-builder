@@ -17,11 +17,12 @@ class FileInfo:
             parts[parts.index('Users') + 1] = 'MyUsername'
         return '\\'.join(parts)
 
+
 class LLMCodePromptBuilder(TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
         self.title("LLM Code Prompt Builder")
-        self.geometry("1000x800")
+        self.geometry("1200x650")
         self.resizable(False, False)
         self.last_update = "N/A"
         self.file_entries = {}
@@ -85,26 +86,31 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.add_separator()
 
         # Prompt Section
-        self.selection_buttons_frame = tk.Frame(self)
+        self.prompt_frame = tk.Frame(self)
+        self.prompt_frame.pack(fill=tk.BOTH, pady=5, expand=True)
+
+        # Left frame for file controls
+        self.file_controls_frame = tk.Frame(self.prompt_frame)
+        self.file_controls_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
+
+        self.selection_buttons_frame = tk.Frame(self.file_controls_frame)
         self.selection_buttons_frame.pack(fill=tk.X, pady=5)
 
         self.select_all_button = tk.Button(self.selection_buttons_frame, text="Select All", command=self.select_all)
         self.select_all_button.pack(side=tk.LEFT, padx=10)
 
-        self.deselect_all_button = tk.Button(self.selection_buttons_frame, text="Deselect All",
-                                             command=self.deselect_all)
+        self.deselect_all_button = tk.Button(self.selection_buttons_frame, text="Deselect All", command=self.deselect_all)
         self.deselect_all_button.pack(side=tk.LEFT)
 
-        self.remove_selected_button = tk.Button(self.selection_buttons_frame, text="Remove Selected",
-                                                command=self.remove_selected)
+        self.remove_selected_button = tk.Button(self.selection_buttons_frame, text="Remove Selected", command=self.remove_selected)
         self.remove_selected_button.pack(side=tk.LEFT, padx=5)
 
         self.remove_all_button = tk.Button(self.selection_buttons_frame, text="Remove All", command=self.remove_all)
         self.remove_all_button.pack(side=tk.LEFT, padx=5)
 
         # Add Search Box
-        self.search_frame = tk.Frame(self)
-        self.search_frame.pack(fill=tk.X, pady=5)  # This is now packed directly after selection_buttons_frame
+        self.search_frame = tk.Frame(self.file_controls_frame)
+        self.search_frame.pack(fill=tk.X, pady=5)
 
         self.search_label = tk.Label(self.search_frame, text="Search:")
         self.search_label.pack(side=tk.LEFT, padx=5)
@@ -114,7 +120,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.search_entry.bind("<KeyRelease>", self.filter_files)
 
         # Container for file list and scrollbar
-        self.file_list_container = tk.Frame(self)
+        self.file_list_container = tk.Frame(self.file_controls_frame)
         self.file_list_container.pack(side="left", fill="both", expand=True)
 
         # File list area with checkboxes and labels
@@ -129,20 +135,32 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
 
         self.file_list_frame.bind("<Configure>", self.on_frame_configure)
 
+        # Right frame for prompt controls
+        self.prompt_controls_frame = tk.Frame(self.prompt_frame)
+        self.prompt_controls_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10)
+
+        # Center frame for Update button
+        self.button_center_frame = tk.Frame(self.prompt_controls_frame)
+        self.button_center_frame.pack(side=tk.TOP, pady=0, anchor='n')
+
         # Update Button
-        self.update_button = tk.Button(self, text="Update Prompt", command=self.update_prompt)
-        self.update_button.pack(side=tk.TOP, pady=10)
+        self.update_button = tk.Button(self.button_center_frame, text="Update Prompt", command=self.update_prompt)
+        self.update_button.pack(side=tk.TOP, pady=5)
 
         # Text display area with label
-        self.text_display_frame = tk.Frame(self, height=200)
-        self.text_display_frame.pack(fill=tk.BOTH)
+        self.text_display_frame = tk.Frame(self.prompt_controls_frame)
+        self.text_display_frame.pack(fill=tk.BOTH, expand=False, pady=0)  # Removed height and padding
         self.text_display_label = tk.Label(self.text_display_frame, text="Prompt:")
         self.text_display_label.pack()
-        self.text_display = scrolledtext.ScrolledText(self.text_display_frame, state='disabled', height=14)
-        self.text_display.pack(fill=tk.BOTH)
+        self.text_display = scrolledtext.ScrolledText(self.text_display_frame, state='disabled', height=10)
+        self.text_display.pack(fill=tk.BOTH, expand=True)
+
+        # Clipboard button below the text display
+        self.clipboard_button = tk.Button(self.prompt_controls_frame, text="Copy to Clipboard", command=self.copy_to_clipboard)
+        self.clipboard_button.pack(side=tk.TOP, pady=5)
 
         # Stats and update frame
-        self.stats_update_frame = tk.Frame(self)
+        self.stats_update_frame = tk.Frame(self.prompt_controls_frame)
         self.stats_update_frame.pack(fill=tk.X)
 
         # File Selection Count Label
@@ -158,10 +176,6 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         # Label for latest update timestamp
         self.update_timestamp_label = tk.Label(self.stats_update_frame, text="Latest Update: N/A")
         self.update_timestamp_label.pack(side=tk.RIGHT, padx=10)
-
-        # Clipboard button
-        self.clipboard_button = tk.Button(self, text="Copy to Clipboard", command=self.copy_to_clipboard)
-        self.clipboard_button.pack(side=tk.BOTTOM, pady=10)
 
     def remove_all(self):
         search_term = self.search_entry.get().lower()
@@ -220,7 +234,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
             file_info.checkbox = Checkbutton(file_info.checkbox_frame, variable=file_info.check_var,
                                              command=self.update_file_selection_count)
             file_info.checkbox.pack(side=tk.LEFT)
-            file_info.label = Label(file_info.checkbox_frame, text=file_info.censored_path, wraplength=250,
+            file_info.label = Label(file_info.checkbox_frame, text=file_info.censored_path, wraplength=400,
                                     justify='left')
             file_info.label.pack(side=tk.LEFT)
             file_info.label.bind("<Button-1>", lambda e, cb=file_info.checkbox: cb.invoke())
