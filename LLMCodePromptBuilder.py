@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog, scrolledtext, Checkbutton, Label, Frame, Canvas, Scrollbar
+from tkinter import filedialog, scrolledtext, Checkbutton, Label, Frame, Canvas, Scrollbar, Entry
 from tkinterdnd2 import DND_FILES, TkinterDnD
 from datetime import datetime
 import os
@@ -13,7 +13,6 @@ class FileInfo:
     @staticmethod
     def censor_username(path):
         parts = path.split('\\')
-        # Replace the username (the part after 'Users') with 'MyUsername'
         if 'Users' in parts and len(parts) > parts.index('Users') + 1:
             parts[parts.index('Users') + 1] = 'MyUsername'
         return '\\'.join(parts)
@@ -23,17 +22,34 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         super().__init__()
         self.title("LLM Code Prompt Builder")
         self.geometry("1000x800")
-        self.resizable(False, False)  # Disable resizing
+        self.resizable(False, False)
         self.last_update = "N/A"
         self.file_entries = {}
+        self.ignore_extensions = []
 
-        # Query input area
+        # Query Section
         self.query_frame = tk.Frame(self)
-        self.query_frame.pack(side=tk.TOP, fill=tk.X)
+        self.query_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
         self.query_label = tk.Label(self.query_frame, text="Query:")
         self.query_label.pack(side=tk.LEFT)
         self.query_input = scrolledtext.ScrolledText(self.query_frame, height=5)
         self.query_input.pack(side=tk.LEFT, expand=True, fill=tk.X)
+
+        # Separator
+        self.add_separator()
+
+        # File/Folder Selection Section
+        self.options_frame = tk.Frame(self)
+        self.options_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
+
+        self.recursion_var = tk.BooleanVar(value=False)
+        self.recursion_checkbox = Checkbutton(self.options_frame, text="Recursively Add Files in Subfolders", variable=self.recursion_var)
+        self.recursion_checkbox.pack(side=tk.LEFT)
+
+        self.ignore_label = tk.Label(self.options_frame, text="Ignore Extensions:")
+        self.ignore_label.pack(side=tk.LEFT, padx=(10, 0))
+        self.ignore_entry = tk.Entry(self.options_frame)
+        self.ignore_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
 
         # Manual Path Entry Area
         self.manual_entry_frame = tk.Frame(self)
@@ -48,12 +64,27 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.drag_drop_frame = tk.Frame(self, height=100, width=1000, bg='light grey')
         self.drag_drop_frame.pack(side=tk.TOP, padx=10, pady=10)
         self.drag_drop_frame.pack_propagate(False)
-        self.drag_drop_label = tk.Label(self.drag_drop_frame, text="Drag Files Here", bg='light grey')
+        self.drag_drop_label = tk.Label(self.drag_drop_frame, text="Drag Files or Folders Here", bg='light grey')
         self.drag_drop_label.pack(expand=True)
 
-        # Add Select All and Deselect All buttons
+        # Enable drag and drop for the frame
+        self.drag_drop_frame.drop_target_register(DND_FILES)
+        self.drag_drop_frame.dnd_bind('<<Drop>>', self.drop)
+
+        # Buttons for file and folder selection
+        self.button_frame = tk.Frame(self)
+        self.button_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
+        self.file_button = tk.Button(self.button_frame, text="Select File", command=self.select_file)
+        self.file_button.pack(side=tk.LEFT)
+        self.folder_button = tk.Button(self.button_frame, text="Select Folder", command=self.select_folder)
+        self.folder_button.pack(side=tk.LEFT, padx=5)
+
+        # Separator
+        self.add_separator()
+
+        # Prompt Section
         self.selection_buttons_frame = tk.Frame(self)
-        self.selection_buttons_frame.pack(fill=tk.X)
+        self.selection_buttons_frame.pack(fill=tk.X, pady=5)
 
         self.select_all_button = tk.Button(self.selection_buttons_frame, text="Select All", command=self.select_all)
         self.select_all_button.pack(side=tk.LEFT, padx=10)
@@ -61,9 +92,8 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.deselect_all_button = tk.Button(self.selection_buttons_frame, text="Deselect All", command=self.deselect_all)
         self.deselect_all_button.pack(side=tk.LEFT)
 
-        # Enable drag and drop
-        self.drag_drop_frame.drop_target_register(DND_FILES)
-        self.drag_drop_frame.dnd_bind('<<Drop>>', self.drop)
+        self.remove_selected_button = tk.Button(self.selection_buttons_frame, text="Remove Selected", command=self.remove_selected)
+        self.remove_selected_button.pack(side=tk.LEFT, padx=5)
 
         # Container for file list and scrollbar
         self.file_list_container = tk.Frame(self)
@@ -75,25 +105,18 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.file_list_scrollbar = Scrollbar(self.file_list_container, orient="vertical", command=self.file_list_canvas.yview)
         self.file_list_canvas.configure(yscrollcommand=self.file_list_scrollbar.set)
 
-        # Bind mouse wheel event to the canvas
-        self.file_list_canvas.bind("<MouseWheel>", self.on_mousewheel)
-        # Propagate mouse wheel event from the frame to the canvas
-        self.file_list_frame.bind("<MouseWheel>", lambda event: self.file_list_canvas.event_generate("<MouseWheel>", delta=event.delta))
-
-        self.bind_to_mousewheel(self.file_list_canvas, self.file_list_frame)
-
-
         self.file_list_scrollbar.pack(side="right", fill="y")
         self.file_list_canvas.pack(side="left", fill="both", expand=True)
-        self.file_list_canvas.create_window((0,0), window=self.file_list_frame, anchor="nw")
+        self.file_list_canvas.create_window((0, 0), window=self.file_list_frame, anchor="nw")
 
         self.file_list_frame.bind("<Configure>", self.on_frame_configure)
 
+        # Update Button
         self.update_button = tk.Button(self, text="Update Prompt", command=self.update_prompt)
-        self.update_button.pack(side=tk.TOP, pady=0)
+        self.update_button.pack(side=tk.TOP, pady=10)
 
         # Text display area with label
-        self.text_display_frame = tk.Frame(self, height=200)  # Set a specific height for the frame
+        self.text_display_frame = tk.Frame(self, height=200)
         self.text_display_frame.pack(fill=tk.BOTH)
         self.text_display_label = tk.Label(self.text_display_frame, text="Prompt:")
         self.text_display_label.pack()
@@ -122,62 +145,107 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.clipboard_button = tk.Button(self, text="Copy to Clipboard", command=self.copy_to_clipboard)
         self.clipboard_button.pack(side=tk.BOTTOM, pady=10)
 
-    def bind_to_mousewheel(self, canvas, frame):
-        # Bind to the canvas
-        canvas.bind("<MouseWheel>", lambda e: self.on_mousewheel(e, canvas))
-
-        # Bind to all child widgets recursively
-        for child in frame.winfo_children():
-            self.bind_to_mousewheel(canvas, child)
-
-    def on_mousewheel(self, event, widget):
-        if os.name == 'nt':  # For Windows
-            widget.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        else:  # For Unix/Linux
-            if event.num == 4:
-                widget.yview_scroll(-1, "units")
-            elif event.num == 5:
-                widget.yview_scroll(1, "units")
+    def add_separator(self):
+        separator = tk.Frame(self, height=2, bd=1, relief=tk.SUNKEN)
+        separator.pack(fill=tk.X, padx=5, pady=10)
 
     def process_file_path(self, file_path):
-
-        # if file_path is surrounded by double quotes or single quotes, remove them
         if (file_path.startswith('"') and file_path.endswith('"')) or (file_path.startswith("'") and file_path.endswith("'")):
             file_path = file_path[1:-1]
 
-        normalized_path = os.path.normpath(file_path)  # Normalize the path
+        normalized_path = os.path.normpath(file_path)
         if normalized_path in self.file_entries:
-            return  # Skip this file as it's already added
+            return
 
-        # Return if the path does not exist
         if not os.path.exists(normalized_path):
             return
 
-        file_info = FileInfo(normalized_path)
+        if os.path.isdir(normalized_path):
+            self.process_directory(normalized_path)
+        else:
+            self.add_file(normalized_path)
+
+    def add_file(self, file_path):
+        extension = os.path.splitext(file_path)[1].lower()
+        if extension in self.ignore_extensions:
+            return
+
+        file_info = FileInfo(file_path)
         file_info.checkbox_frame = Frame(self.file_list_frame)
         file_info.checkbox = Checkbutton(file_info.checkbox_frame, variable=file_info.check_var, command=self.update_file_selection_count)
         file_info.checkbox.pack(side=tk.LEFT)
-        file_info.label = Label(file_info.checkbox_frame, text=normalized_path, wraplength=250, justify='left')
+        file_info.label = Label(file_info.checkbox_frame, text=file_info.censored_path, wraplength=250, justify='left')
         file_info.label.pack(side=tk.LEFT)
         file_info.label.bind("<Button-1>", lambda e, cb=file_info.checkbox: cb.invoke())
         file_info.checkbox_frame.pack(anchor='w', fill='x')
-        self.file_entries[normalized_path] = file_info
+        self.file_entries[file_path] = file_info
         self.update_file_selection_count()
 
-    def add_path(self, event=None):  # event parameter is added to handle the key press
+    def process_directory(self, dir_path):
+        for root, dirs, files in os.walk(dir_path):
+            for file_name in files:
+                file_path = os.path.join(root, file_name)
+                normalized_path = os.path.normpath(file_path)
+                if normalized_path not in self.file_entries:
+                    self.add_file(normalized_path)
+            if not self.recursion_var.get():
+                break
+
+    def add_path(self, event=None):
         path = self.path_entry.get().strip()
         if path:
             self.process_file_path(path)
-            self.path_entry.delete(0, tk.END)  # Clear the entry field
+            self.path_entry.delete(0, tk.END)
 
-    def select_all(self):
-        for file_info in self.file_entries.values():
-            file_info.check_var.set(True)
-        self.update_file_selection_count()
+    def select_file(self):
+        file_path = filedialog.askopenfilename()
+        if file_path:
+            self.process_file_path(file_path)
 
-    def deselect_all(self):
+    def select_folder(self):
+        folder_path = filedialog.askdirectory()
+        if folder_path:
+            self.process_file_path(folder_path)
+
+    def drop(self, event):
+        file_paths = self.parse_file_paths(event.data)
+        for file_path in file_paths:
+            self.process_file_path(file_path)
+
+    def update_prompt(self):
+        self.ignore_extensions = [ext.strip().lower() for ext in self.ignore_entry.get().split(',') if ext.strip()]
+
+        prompt_text = self.query_input.get("1.0", tk.END) + "\n\n"
         for file_info in self.file_entries.values():
-            file_info.check_var.set(False)
+            if file_info.check_var.get():
+                with open(file_info.file_path, 'r') as file:
+                    content = file.read()
+                    prompt_text += f"CONTENTS OF {file_info.censored_path}:\n\n{content}\n\n"
+
+        self.text_display.config(state='normal')
+        self.text_display.delete(1.0, tk.END)
+        self.text_display.insert(tk.INSERT, prompt_text)
+        self.text_display.config(state='disabled')
+
+        self.update_counts(prompt_text)
+        self.last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.update_timestamp_label.config(text=f"Latest Update: {self.last_update}")
+
+    def update_counts(self, text):
+        char_count = len(text)
+        word_count = len(text.split())
+        self.char_count_label.config(text=f"Characters: {char_count}")
+        self.word_count_label.config(text=f"Words: {word_count}")
+
+    def update_file_selection_count(self):
+        count = sum(file_info.check_var.get() for file_info in self.file_entries.values())
+        self.file_selection_count_label.config(text=f"Selected Files: {count}")
+
+    def remove_selected(self):
+        selected_files = [path for path, info in self.file_entries.items() if info.check_var.get()]
+        for path in selected_files:
+            self.file_entries[path].checkbox_frame.destroy()
+            del self.file_entries[path]
         self.update_file_selection_count()
 
     def on_frame_configure(self, event=None):
@@ -186,15 +254,9 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
     @staticmethod
     def parse_file_paths(data_string):
         file_paths = []
-
         if '{' in data_string and '}' in data_string:
-            # Paths contain space(s), and are contained within braces in a single string.
-            # eg. '{C:/Users/PC/Documents/1STRESS TESTING/RAM Test 1.1.0.0/ramtest.log}
-            # {C:/Users/PC/Documents/1STRESS TESTING/RAM Test 1.1.0.0/README.txt}
-            # {C:/Users/PC/Documents/1STRESS TESTING/RAM Test 1.1.0.0/settings.txt}'
             current_path = ''
             inside_braces = False
-
             for char in data_string:
                 if char == '{':
                     inside_braces = True
@@ -205,55 +267,22 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
                 elif inside_braces:
                     current_path += char
         else:
-            # A path does not contain a space; a space separates each path.
-            # eg. 'C:/Users/PC/Desktop/misc/coding/repos/public/llm-code-prompt-builder/LLMCodePromptBuilder.py C:/Users/PC/Desktop/misc/coding/repos/public/llm-code-prompt-builder/README.md'
             file_paths = data_string.split()
-
         return file_paths
-
-    def drop(self, event):
-        # event.data looks like
-        file_paths = self.parse_file_paths(event.data)
-        for file_path in file_paths:
-            self.process_file_path(file_path)
-
-    def toggle_checkbox(self, check_var):
-        check_var.set(not check_var.get())
 
     def copy_to_clipboard(self):
         self.clipboard_clear()
         self.clipboard_append(self.text_display.get(1.0, tk.END))
 
-    def update_prompt(self):
-        prompt_text = self.query_input.get("1.0", tk.END) + "\n\n"
+    def select_all(self):
         for file_info in self.file_entries.values():
-            if file_info.check_var.get():
-                with open(file_info.file_path, 'r') as file:
-                    content = file.read()
-                    # Use the censored path for the prompt text instead of the actual path
-                    prompt_text += f"CONTENTS OF {file_info.censored_path}:\n\n{content}\n\n"
+            file_info.check_var.set(True)
+        self.update_file_selection_count()
 
-        self.text_display.config(state='normal')
-        self.text_display.delete(1.0, tk.END)
-        self.text_display.insert(tk.INSERT, prompt_text)
-        self.text_display.config(state='disabled')
-
-        # Update character and word counts
-        self.update_counts(prompt_text)
-
-        # Update timestamp
-        self.last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self.update_timestamp_label.config(text=f"Latest Update: {self.last_update}")
-
-    def update_counts(self, text):
-        char_count = len(text)
-        word_count = len(text.split())  # Simple word count as a token estimate
-        self.char_count_label.config(text=f"Characters: {char_count}")
-        self.word_count_label.config(text=f"Words: {word_count}")
-
-    def update_file_selection_count(self):
-        count = sum(file_info.check_var.get() for file_info in self.file_entries.values())
-        self.file_selection_count_label.config(text=f"Selected Files: {count}")
+    def deselect_all(self):
+        for file_info in self.file_entries.values():
+            file_info.check_var.set(False)
+        self.update_file_selection_count()
 
 if __name__ == "__main__":
     app = LLMCodePromptBuilder()
