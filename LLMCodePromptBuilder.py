@@ -177,6 +177,22 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.update_timestamp_label = tk.Label(self.stats_update_frame, text="Latest Update: N/A")
         self.update_timestamp_label.pack(side=tk.RIGHT, padx=10)
 
+        # Bind the mouse scroll to the canvas
+        self.file_list_canvas.bind_all("<MouseWheel>", self.on_mouse_wheel)
+        self.file_list_canvas.bind_all("<Button-4>", self.on_mouse_wheel)  # For Linux/Mac
+        self.file_list_canvas.bind_all("<Button-5>", self.on_mouse_wheel)  # For Linux/Mac
+
+
+
+    def on_mouse_wheel(self, event):
+        if event.num == 4:  # For Linux/Mac scroll up
+            self.file_list_canvas.yview_scroll(-1, "units")
+        elif event.num == 5:  # For Linux/Mac scroll down
+            self.file_list_canvas.yview_scroll(1, "units")
+        else:  # For Windows scroll
+            self.file_list_canvas.yview_scroll(-1 * int(event.delta / 120), "units")
+
+
     def remove_all(self):
         search_term = self.search_entry.get().lower()
         to_remove = [path for path, info in self.file_entries.items() if search_term in path.lower()]
