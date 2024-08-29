@@ -293,12 +293,17 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         whitelist_input = self.whitelist_entry.get().strip()
         self.whitelisted_extensions = [ext.strip().lower() for ext in whitelist_input.split(',') if ext.strip()]
 
+        checked_files = [file_info for file_info in self.file_entries.values() if file_info.check_var.get()]
+
+        if len(checked_files) == 0:
+            return
+
         prompt_text = self.query_input.get("1.0", tk.END) + "\n\n"
-        for file_info in self.file_entries.values():
-            if file_info.check_var.get():
-                with open(file_info.file_path, 'r') as file:
-                    content = file.read()
-                    prompt_text += f"CONTENTS OF {file_info.censored_path}:\n\n{content}\n\n"
+
+        for file_info in checked_files:
+            with open(file_info.file_path, 'r') as file:
+                content = file.read()
+                prompt_text += f"CONTENTS OF {file_info.censored_path}:\n\n{content}\n"
 
         self.text_display.config(state='normal')
         self.text_display.delete(1.0, tk.END)
