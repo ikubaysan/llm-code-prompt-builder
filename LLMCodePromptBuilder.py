@@ -301,7 +301,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         prompt_text = self.query_input.get("1.0", tk.END) + "\n\n"
 
         for file_info in checked_files:
-            with open(file_info.file_path, 'r') as file:
+            with open(file_info.file_path, 'r', encoding='utf-8') as file:
                 content = file.read()
                 prompt_text += f"CONTENTS OF {file_info.censored_path}:\n\n{content}\n"
 
