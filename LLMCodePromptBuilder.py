@@ -46,7 +46,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.recursion_checkbox = Checkbutton(self.options_frame, text="Recursively Add Files in Subfolders", variable=self.recursion_var)
         self.recursion_checkbox.pack(side=tk.LEFT)
 
-        self.whitelisted_extensions = ['py', 'cs', 'cpp']
+        self.whitelisted_extensions = ['py', 'cs', 'cpp', 'json']
 
         self.whitelist_label = tk.Label(self.options_frame, text="Whitelisted Extensions:")
         self.whitelist_label.pack(side=tk.LEFT, padx=(10, 0))
@@ -206,6 +206,10 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         separator.pack(fill=tk.X, padx=5, pady=10)
 
     def process_file_path(self, file_path):
+        # Reload whitelisted extensions before processing
+        whitelist_input = self.whitelist_entry.get().strip()
+        self.whitelisted_extensions = [ext.strip().lower() for ext in whitelist_input.split(',') if ext.strip()]
+
         if (file_path.startswith('"') and file_path.endswith('"')) or (file_path.startswith("'") and file_path.endswith("'")):
             file_path = file_path[1:-1]
 
@@ -240,8 +244,13 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.update_file_selection_count()
 
     def add_file(self, file_path):
+        # Reload whitelisted extensions from the entry field
+        whitelist_input = self.whitelist_entry.get().strip()
+        self.whitelisted_extensions = [ext.strip().lower() for ext in whitelist_input.split(',') if ext.strip()]
+
         extension = os.path.splitext(file_path)[1].lower().lstrip('.')
         if self.whitelisted_extensions and extension not in self.whitelisted_extensions:
+            print(f"Skipping {file_path} due to extension '{extension}' not in whitelist.")
             return
 
         if file_path not in self.file_entries:  # Ensure no duplicates
