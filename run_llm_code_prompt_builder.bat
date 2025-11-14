@@ -35,8 +35,8 @@ call venv\Scripts\activate
 REM -----------------------------------------
 REM Run your Python script
 REM -----------------------------------------
-echo Running LLMCodePromptBuilder.py...
-python LLMCodePromptBuilder.py
+echo Running main.py...
+python main.py
 echo Script finished.
 
 pause
