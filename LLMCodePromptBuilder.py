@@ -4,11 +4,13 @@ from tkinterdnd2 import DND_FILES, TkinterDnD
 from datetime import datetime
 import os
 import logging
+import json  # <<< NEW
 from Loggers import configure_console_logger
 
 
 configure_console_logger()
 logger = logging.getLogger(__name__)
+
 
 class FileInfo:
     def __init__(self, file_path):
@@ -32,6 +34,12 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.resizable(False, False)
         self.last_update = "N/A"
         self.file_entries = {}
+
+        # <<< NEW: where to store state (same folder as this script)
+        self.state_file_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "llm_code_prompt_builder_state.json"
+        )
 
         # Query Section
         self.query_frame = tk.Frame(self)
@@ -59,6 +67,10 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.whitelist_entry = tk.Entry(self.options_frame)
         self.whitelist_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
         self.whitelist_entry.insert(0, ', '.join(self.whitelisted_extensions))
+
+        # <<< NEW: track changes to whitelist and save
+        self.whitelist_entry.bind("<FocusOut>", self.on_whitelist_change)
+        self.whitelist_entry.bind("<Return>", self.on_whitelist_change)
 
         # Manual Path Entry Area
         self.manual_entry_frame = tk.Frame(self)
@@ -188,7 +200,86 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         self.file_list_canvas.bind_all("<Button-4>", self.on_mouse_wheel)  # For Linux/Mac
         self.file_list_canvas.bind_all("<Button-5>", self.on_mouse_wheel)  # For Linux/Mac
 
+        # <<< NEW: load saved state after UI is built
+        self.load_state()
 
+        # <<< NEW: ensure we save one last time on close
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    # <<< NEW
+    def on_close(self):
+        self.save_state()
+        self.destroy()
+
+    # <<< NEW
+    def on_whitelist_change(self, event=None):
+        whitelist_input = self.whitelist_entry.get().strip()
+        self.whitelisted_extensions = [ext.strip().lower() for ext in whitelist_input.split(',') if ext.strip()]
+        self.save_state()
+
+    # <<< NEW
+    def save_state(self):
+        """Save whitelisted extensions and file list (with selection) to JSON."""
+        try:
+            state = {
+                "whitelisted_extensions": self.whitelisted_extensions,
+                "files": [
+                    {
+                        "path": path,
+                        "selected": bool(info.check_var.get())
+                    }
+                    for path, info in self.file_entries.items()
+                ]
+            }
+            with open(self.state_file_path, "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=2)
+        except Exception as e:
+            logger.warning(f"[LLMCodePromptBuilder] Failed to save state: {e}")
+
+    # <<< NEW
+    def load_state(self):
+        """Load state from JSON and restore whitelist + file list."""
+        if not os.path.exists(self.state_file_path):
+            return
+
+        try:
+            with open(self.state_file_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+        except Exception as e:
+            logger.warning(f"[LLMCodePromptBuilder] Failed to load state: {e}")
+            return
+
+        # Restore whitelist
+        exts = state.get("whitelisted_extensions")
+        if isinstance(exts, list):
+            self.whitelisted_extensions = [str(x).strip().lower() for x in exts if str(x).strip()]
+            self.whitelist_entry.delete(0, tk.END)
+            self.whitelist_entry.insert(0, ", ".join(self.whitelisted_extensions))
+
+        # Restore files
+        for file_state in state.get("files", []):
+            path = file_state.get("path")
+            selected = bool(file_state.get("selected"))
+            if not path:
+                continue
+            if not os.path.exists(path):
+                # Skip non-existing files on load
+                continue
+
+            self.add_file(path)
+            # After add_file, self.file_entries should contain this path
+            info = self.file_entries.get(path)
+            if info:
+                info.check_var.set(selected)
+
+        self.filter_files()
+        self.update_file_selection_count()
+
+    # <<< NEW
+    def on_file_checkbox_toggled(self, file_info):
+        """Called when a file's checkbox is toggled."""
+        self.update_file_selection_count()
+        self.save_state()
 
     def on_mouse_wheel(self, event):
         if event.num == 4:  # For Linux/Mac scroll up
@@ -198,7 +289,6 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         else:  # For Windows scroll
             self.file_list_canvas.yview_scroll(-1 * int(event.delta / 120), "units")
 
-
     def remove_all(self):
         search_term = self.search_entry.get().lower()
         to_remove = [path for path, info in self.file_entries.items() if search_term in path.lower()]
@@ -206,6 +296,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
             self.file_entries[path].checkbox_frame.destroy()
             del self.file_entries[path]
         self.update_file_selection_count()
+        self.save_state()  # <<< NEW
 
     def add_separator(self):
         separator = tk.Frame(self, height=2, bd=1, relief=tk.SUNKEN)
@@ -262,8 +353,12 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         if file_path not in self.file_entries:  # Ensure no duplicates
             file_info = FileInfo(file_path)
             file_info.checkbox_frame = Frame(self.file_list_frame)
-            file_info.checkbox = Checkbutton(file_info.checkbox_frame, variable=file_info.check_var,
-                                             command=self.update_file_selection_count)
+            # <<< CHANGED: hook checkbox to our handler so we can save state
+            file_info.checkbox = Checkbutton(
+                file_info.checkbox_frame,
+                variable=file_info.check_var,
+                command=lambda fi=file_info: self.on_file_checkbox_toggled(fi)
+            )
             file_info.checkbox.pack(side=tk.LEFT)
             file_info.label = Label(file_info.checkbox_frame, text=file_info.censored_path, wraplength=400,
                                     justify='left')
@@ -272,6 +367,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
             self.file_entries[file_path] = file_info
             self.filter_files()  # Update and sort the list after adding a file
             self.update_file_selection_count()
+            self.save_state()  # <<< NEW
 
     def process_directory(self, dir_path):
         for root, dirs, files in os.walk(dir_path):
@@ -288,22 +384,26 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         if path:
             self.process_file_path(path)
             self.path_entry.delete(0, tk.END)
+            self.save_state()  # <<< NEW
 
     def select_file(self):
         file_path = filedialog.askopenfilename()
         if file_path:
             self.process_file_path(file_path)
+            self.save_state()  # <<< NEW
 
     def select_folder(self):
         folder_path = filedialog.askdirectory()
         if folder_path:
             self.process_file_path(folder_path)
+            self.save_state()  # <<< NEW
 
     def drop(self, event):
         file_paths = self.parse_file_paths(event.data)
         for file_path in file_paths:
             self.process_file_path(file_path)
-            
+        self.save_state()  # <<< NEW
+
     def update_prompt(self):
         # Reload whitelist (keeps behavior consistent with other methods)
         whitelist_input = self.whitelist_entry.get().strip()
@@ -345,6 +445,9 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
             file_info.checkbox_frame.destroy()
             del self.file_entries[path]
 
+        if missing_paths:
+            self.save_state()  # <<< NEW (state changed)
+
         # Refresh filtered view and selection count after removals
         self.filter_files()
         self.update_file_selection_count()
@@ -376,6 +479,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
             del self.file_entries[path]
         self.filter_files()  # Update and sort the list after removing a file
         self.update_file_selection_count()
+        self.save_state()  # <<< NEW
 
     def on_frame_configure(self, event=None):
         self.file_list_canvas.configure(scrollregion=self.file_list_canvas.bbox("all"))
@@ -409,6 +513,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
             if search_term in file_info.file_path.lower():
                 file_info.check_var.set(True)
         self.update_file_selection_count()
+        self.save_state()  # <<< NEW
 
     def deselect_all(self):
         search_term = self.search_entry.get().lower()
@@ -416,6 +521,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
             if search_term in file_info.file_path.lower():
                 file_info.check_var.set(False)
         self.update_file_selection_count()
+        self.save_state()  # <<< NEW
 
 
 if __name__ == "__main__":
