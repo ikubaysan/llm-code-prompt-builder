@@ -297,11 +297,13 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
         file_paths = self.parse_file_paths(event.data)
         for file_path in file_paths:
             self.process_file_path(file_path)
-
+            
     def update_prompt(self):
+        # Reload whitelist (keeps behavior consistent with other methods)
         whitelist_input = self.whitelist_entry.get().strip()
         self.whitelisted_extensions = [ext.strip().lower() for ext in whitelist_input.split(',') if ext.strip()]
 
+        # All checked files
         checked_files = [file_info for file_info in self.file_entries.values() if file_info.check_var.get()]
 
         if len(checked_files) == 0:
@@ -309,11 +311,39 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
 
         prompt_text = self.query_input.get("1.0", tk.END) + "\n\n"
 
-        for file_info in checked_files:
-            with open(file_info.file_path, 'r', encoding='utf-8') as file:
-                content = file.read()
-                prompt_text += f"CONTENTS OF {file_info.censored_path}:\n\n{content}\n"
+        missing_paths = []
+        any_file_added = False
 
+        for path, file_info in list(self.file_entries.items()):
+            if not file_info.check_var.get():
+                continue
+
+            # If the file no longer exists, log and mark for removal
+            if not os.path.exists(file_info.file_path):
+                print(f"[LLMCodePromptBuilder] File missing, removing from list: {file_info.file_path}")
+                missing_paths.append(path)
+                continue
+
+            # Try reading the file; if it fails, log and skip but don't remove
+            try:
+                with open(file_info.file_path, 'r', encoding='utf-8') as file:
+                    content = file.read()
+                    prompt_text += f"CONTENTS OF {file_info.censored_path}:\n\n{content}\n"
+                    any_file_added = True
+            except OSError as e:
+                print(f"[LLMCodePromptBuilder] Error reading file {file_info.file_path}: {e}")
+
+        # Remove missing files from the UI and internal dict
+        for path in missing_paths:
+            file_info = self.file_entries[path]
+            file_info.checkbox_frame.destroy()
+            del self.file_entries[path]
+
+        # Refresh filtered view and selection count after removals
+        self.filter_files()
+        self.update_file_selection_count()
+
+        # If no files could be read, still show the query text so the user sees *something*
         self.text_display.config(state='normal')
         self.text_display.delete(1.0, tk.END)
         self.text_display.insert(tk.INSERT, prompt_text)
