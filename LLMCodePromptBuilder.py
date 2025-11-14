@@ -3,6 +3,12 @@ from tkinter import filedialog, scrolledtext, Checkbutton, Label, Frame, Canvas,
 from tkinterdnd2 import DND_FILES, TkinterDnD
 from datetime import datetime
 import os
+import logging
+from Loggers import configure_console_logger
+
+
+configure_console_logger()
+logger = logging.getLogger(__name__)
 
 class FileInfo:
     def __init__(self, file_path):
@@ -250,7 +256,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
 
         extension = os.path.splitext(file_path)[1].lower().lstrip('.')
         if self.whitelisted_extensions and extension not in self.whitelisted_extensions:
-            print(f"Skipping {file_path} due to extension '{extension}' not in whitelist.")
+            logger.info(f"Skipping {file_path} due to extension '{extension}' not in whitelist.")
             return
 
         if file_path not in self.file_entries:  # Ensure no duplicates
@@ -320,7 +326,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
 
             # If the file no longer exists, log and mark for removal
             if not os.path.exists(file_info.file_path):
-                print(f"[LLMCodePromptBuilder] File missing, removing from list: {file_info.file_path}")
+                logger.warning(f"[LLMCodePromptBuilder] File missing, removing from list: {file_info.file_path}")
                 missing_paths.append(path)
                 continue
 
@@ -331,7 +337,7 @@ class LLMCodePromptBuilder(TkinterDnD.Tk):
                     prompt_text += f"CONTENTS OF {file_info.censored_path}:\n\n{content}\n"
                     any_file_added = True
             except OSError as e:
-                print(f"[LLMCodePromptBuilder] Error reading file {file_info.file_path}: {e}")
+                logger.warning(f"[LLMCodePromptBuilder] Error reading file {file_info.file_path}: {e}")
 
         # Remove missing files from the UI and internal dict
         for path in missing_paths:
